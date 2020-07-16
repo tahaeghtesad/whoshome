@@ -2,5 +2,6 @@
 *.js
 *.txt
 *.pyc
-env/
+venv/
 .vscode/
+.idea/
