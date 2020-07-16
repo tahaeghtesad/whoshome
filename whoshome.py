@@ -71,6 +71,7 @@ def getActiveClients():
 
     return activeClients
 
+
 def sendNotification(status, mac, info):
     recipients = ['tahaeghtesad@gmail.com']
     s = smtplib.SMTP('smtp.gmail.com', 587)
@@ -88,17 +89,20 @@ def sendNotification(status, mac, info):
 
         s.send_message(msg)
 
-
 if __name__ == '__main__':
-    clients = {}
-    previousMacs = getActiveClients().keys()
+    sendNotification(0, 'Taha', {'nickName': 'Taw', 'message': 'Let the scrapers scrape!'})
+    clients = getActiveClients()
+    previousMacs = clients.keys()
     while True:
-        time.sleep(10)
-        activeClients = getActiveClients()
-        clients.update(activeClients)
-        currentMacs = activeClients.keys()
-        for entering in currentMacs - previousMacs:
-            sendNotification(0, entering, clients[entering])
-        for leaving in previousMacs - currentMacs:
-            sendNotification(1, leaving, clients[leaving])
-        previousMacs = currentMacs
+        try:
+            time.sleep(10)
+            activeClients = getActiveClients()
+            clients.update(activeClients)
+            currentMacs = activeClients.keys()
+            for entering in currentMacs - previousMacs:
+                sendNotification(0, entering, clients[entering])
+            for leaving in previousMacs - currentMacs:
+                sendNotification(1, leaving, clients[leaving])
+            previousMacs = currentMacs
+        except KeyboardInterrupt:
+            exit(-1)
