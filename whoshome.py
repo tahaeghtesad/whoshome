@@ -6,27 +6,29 @@ by Brandon Asuncion <me@brandonasuncion.tech>
 
 Uses an ASUS router's web interface to determine active wireless devices.
 '''
+import time
+
 import requests
 import re
 import json
 from base64 import b64encode
 from collections import defaultdict
 
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import smtplib
+
 ### START CONFIG ###
 
-USERNAME = "username"
-PASSWORD = "password"
-GATEWAY = "192.168.1.1"
-
-USERS = {
-    'Me': ['5C:F9:38:8E:0B:E6', '60:9A:C1:12:9A:13'],
-    'Dad': ['D0:33:11:5F:01:0E'],
-    'Mom': ['D0:A6:37:7F:8F:99'],
-}
+USERNAME = "admin"
+PASSWORD = "admin@12"
+GATEWAY = "a0756eb35481f5fcb3da11a82511625c4.asuscomm.com:8443"
+PORT = "8443"
 
 ### END CONFIG ###
 
 safeInt = lambda i: int(float(i)) if i.strip() else 0
+
 
 def getActiveClients():
     s = requests.Session()
@@ -41,44 +43,62 @@ def getActiveClients():
         'login_authorization': b64encode("{}:{}".format(USERNAME, PASSWORD).encode())
     }
 
-    reqHeaders = {'Referer': "http://{}/".format(GATEWAY)}
+    reqHeaders = {'Referer': "https://{}/".format(GATEWAY)}
 
     # Login to router
-    s.post("http://{}/login.cgi".format(GATEWAY), data=loginData, headers=reqHeaders, verify=False)
+    s.post("https://{}/login.cgi".format(GATEWAY), data=loginData, headers=reqHeaders, verify=False)
 
     # Get client data
-    clientData = s.get("http://{}/update_clients.asp".format(GATEWAY), headers=reqHeaders, verify=False).text
+    clientData = s.get("https://{}/update_clients.asp".format(GATEWAY), headers=reqHeaders, verify=False).text
 
     # Logout
-    s.get("http://{}/Logout.asp".format(GATEWAY), headers=reqHeaders, verify=False)
+    s.get("https://{}/Logout.asp".format(GATEWAY), headers=reqHeaders, verify=False)
 
-
-    activeClients = defaultdict(lambda :{})
-    clientLists = re.findall(r"(?:g:(\s){1,})(\[(.)*?],\n)", clientData)
-    for cList in clientLists:
-
-        clientData = json.loads(cList[1].strip()[:-1])
-        for c in clientData:
-            device = c[0]
-
-            if ':' in c[3]:
-                activeClients[device]['Tx'] = safeInt(c[1])
-                activeClients[device]['Rx'] = safeInt(c[2])
-                activeClients[device]['accessTime'] = c[3]
-                
-            else:
-                activeClients[device]['isWireless'] = c[1] == 'Yes'
-                activeClients[device]['unknown'] = c[2] == 'Yes'
-                activeClients[device]['RSSI'] = c[3]
+    activeClients = defaultdict(lambda: {})
+    stripped_data = clientData[clientData.find('{'):clientData.rfind('}') + 1].replace('\n', '').replace('\\n', '')
+    fixed_json = stripped_data.replace('{fromNetworkmapd', '{"fromNetworkmapd"') \
+        .replace(',nmpClient', ',"nmpClient"')
+    clientLists = json.loads(fixed_json)
+    for k, v in clientLists['fromNetworkmapd'][0].items():
+        if k != 'maclist':
+            activeClients[k]['Tx'] = safeInt(v['curTx'])
+            activeClients[k]['Rx'] = safeInt(v['curRx'])
+            activeClients[k]['accessTime'] = v['wlConnectTime']
+            activeClients[k]['name'] = v['name']
+            activeClients[k]['nickName'] = v['nickName']
+            activeClients[k]['isWireless'] = v['isWL'] != '0'
+            activeClients[k]['RSSI'] = v['rssi']
 
     return activeClients
 
-def activeUsers():
-    activeClients = getActiveClients()
-    for user, MACs in USERS.items():
-        if any(device in activeClients for device in activeClients):
-            yield user
+def sendNotification(status, mac, info):
+    recipients = ['tahaeghtesad@gmail.com']
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.login('tahaeghtesad@gmail.com', 'duwmgkaqyhgjifya')
+    print(f'{info["nickName"]} has {"left" if status == 1 else "entered"} the house')
+
+    for to in recipients:
+        msg = MIMEMultipart()
+        msg['From'] = 'tahaeghtesad@gmail.com'
+        msg['To'] = to
+        msg['Subject'] = f'WhosHome | {info["nickName"]} has {"left" if status == 1 else "entered"} the house'
+        msg.attach(MIMEText(f'{mac}\n{info}', 'plain'))
+
+        s.send_message(msg)
+
 
 if __name__ == '__main__':
-    for user in activeUsers():
-        print(user)
+    clients = {}
+    previousMacs = getActiveClients().keys()
+    while True:
+        time.sleep(10)
+        activeClients = getActiveClients()
+        clients.update(activeClients)
+        currentMacs = activeClients.keys()
+        for entering in currentMacs - previousMacs:
+            sendNotification(0, entering, clients[entering])
+        for leaving in previousMacs - currentMacs:
+            sendNotification(1, leaving, clients[leaving])
+        previousMacs = currentMacs
