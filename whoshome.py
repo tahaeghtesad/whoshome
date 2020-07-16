@@ -25,6 +25,8 @@ PASSWORD = "admin@12"
 GATEWAY = "a0756eb35481f5fcb3da11a82511625c4.asuscomm.com:8443"
 PORT = "8443"
 
+BLACKLIST = {'E8:D8:19:3F:DE:4B', '74:40:BE:E9:FC:F6'}
+
 ### END CONFIG ###
 
 safeInt = lambda i: int(float(i)) if i.strip() else 0
@@ -72,25 +74,28 @@ def getActiveClients():
     return activeClients
 
 
-def sendNotification(status, mac, info):
-    recipients = ['tahaeghtesad@gmail.com']
+def sendEmail(to, subject, text):
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.ehlo()
     s.starttls()
     s.login('tahaeghtesad@gmail.com', 'duwmgkaqyhgjifya')
+    msg = MIMEMultipart()
+    msg['From'] = 'tahaeghtesad@gmail.com'
+    msg['To'] = to
+    msg['Subject'] = subject
+    msg.attach(MIMEText(text, 'plain'))
+
+    s.send_message(msg)
+
+
+def notifyEvent(status, mac, info):
+    recipients = ['tahaeghtesad@gmail.com']
     print(f'{info["nickName"]} has {"left" if status == 1 else "entered"} the house')
 
     for to in recipients:
-        msg = MIMEMultipart()
-        msg['From'] = 'tahaeghtesad@gmail.com'
-        msg['To'] = to
-        msg['Subject'] = f'WhosHome | {info["nickName"]} has {"left" if status == 1 else "entered"} the house'
-        msg.attach(MIMEText(f'{mac}\n{info}', 'plain'))
+        sendEmail(to, f'{info["nickName"]} has {"left" if status == 1 else "entered"} the house', f'{mac}\n{info}')
 
-        s.send_message(msg)
-
-if __name__ == '__main__':
-    sendNotification(0, 'Taha', {'nickName': 'Taw', 'message': 'Let the scrapers scrape!'})
+def checkIncomingOutgoing():
     clients = getActiveClients()
     previousMacs = clients.keys()
     while True:
@@ -100,9 +105,35 @@ if __name__ == '__main__':
             clients.update(activeClients)
             currentMacs = activeClients.keys()
             for entering in currentMacs - previousMacs:
-                sendNotification(0, entering, clients[entering])
+                if entering not in BLACKLIST:
+                    notifyEvent(0, entering, clients[entering])
             for leaving in previousMacs - currentMacs:
-                sendNotification(1, leaving, clients[leaving])
+                if leaving not in BLACKLIST:
+                    notifyEvent(1, leaving, clients[leaving])
             previousMacs = currentMacs
-        except KeyboardInterrupt:
-            exit(-1)
+        except Exception as e:
+            print(e)
+
+def checkWhosHome():
+    clients = getActiveClients()
+    while True:
+        try:
+            time.sleep(1800)
+            activeClients = getActiveClients()
+            clients.update(activeClients)
+            sendEmail('tahaeghtesad@gmail.com', 'WhosHomeReport', activeClients)
+        except Exception as e:
+            print(e)
+
+
+if __name__ == '__main__':
+    sendEmail('tahaeghtesad@gmail.com', 'WhosHome Scraper Started', 'Let the scrapers scrape.')
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = set()
+        futures.add(executor.submit(checkIncomingOutgoing))
+        futures.add(executor.submit(checkWhosHome))
+
+        for future in concurrent.futures.as_completed(futures):
+            pass
