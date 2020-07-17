@@ -123,5 +123,6 @@ def checkIncomingOutgoing():
 
 if __name__ == '__main__':
     sendEmail('tahaeghtesad@gmail.com', 'WhosHome Scraper Started', 'Let the scrapers scrape.')
+    checkIncomingOutgoing()
 
 
