@@ -96,7 +96,7 @@ def notifyEvent(status, mac, info):
     print(f'{info["nickName"]} has {"left" if status == 1 else "entered"} the house')
 
     for to in recipients:
-        sendEmail(to, f'{info["nickName"]} has {"left" if status == 1 else "entered"} the house', f'{mac}\n{info}')
+        sendEmail(to, f'WhosHome | {info["nickName"]} has {"left" if status == 1 else "entered"} the house', f'{mac}\n{info}')
 
 def checkIncomingOutgoing():
     iter = 0
@@ -116,7 +116,7 @@ def checkIncomingOutgoing():
         previousMacs = currentMacs
 
         if iter % 180 == 0:
-            sendEmail('tahaeghtesad@gmail.com', 'WhosHomeReport', json.dumps(activeClients, indent=4))
+            sendEmail('tahaeghtesad@gmail.com', 'WhosHome | Report', json.dumps(activeClients, indent=4))
 
         iter += 1
 
