@@ -25,7 +25,10 @@ PASSWORD = "admin@12"
 GATEWAY = "a0756eb35481f5fcb3da11a82511625c4.asuscomm.com:8443"
 PORT = "8443"
 
-BLACKLIST = {'E8:D8:19:3F:DE:4B', '74:40:BE:E9:FC:F6'}
+BLACKLIST = {
+    'E8:D8:19:3F:DE:4B',
+    '74:40:BE:E9:FC:F6',
+}
 
 ### END CONFIG ###
 
@@ -96,44 +99,29 @@ def notifyEvent(status, mac, info):
         sendEmail(to, f'{info["nickName"]} has {"left" if status == 1 else "entered"} the house', f'{mac}\n{info}')
 
 def checkIncomingOutgoing():
+    iter = 0
     clients = getActiveClients()
     previousMacs = clients.keys()
     while True:
-        try:
-            time.sleep(10)
-            activeClients = getActiveClients()
-            clients.update(activeClients)
-            currentMacs = activeClients.keys()
-            for entering in currentMacs - previousMacs:
-                if entering not in BLACKLIST:
-                    notifyEvent(0, entering, clients[entering])
-            for leaving in previousMacs - currentMacs:
-                if leaving not in BLACKLIST:
-                    notifyEvent(1, leaving, clients[leaving])
-            previousMacs = currentMacs
-        except Exception as e:
-            print(e)
+        time.sleep(10)
+        activeClients = getActiveClients()
+        clients.update(activeClients)
+        currentMacs = activeClients.keys()
+        for entering in currentMacs - previousMacs:
+            if entering not in BLACKLIST:
+                notifyEvent(0, entering, clients[entering])
+        for leaving in previousMacs - currentMacs:
+            if leaving not in BLACKLIST:
+                notifyEvent(1, leaving, clients[leaving])
+        previousMacs = currentMacs
 
-def checkWhosHome():
-    clients = getActiveClients()
-    while True:
-        try:
-            time.sleep(1800)
-            activeClients = getActiveClients()
-            clients.update(activeClients)
+        if iter % 180 == 0:
             sendEmail('tahaeghtesad@gmail.com', 'WhosHomeReport', activeClients)
-        except Exception as e:
-            print(e)
+
+        iter += 1
 
 
 if __name__ == '__main__':
     sendEmail('tahaeghtesad@gmail.com', 'WhosHome Scraper Started', 'Let the scrapers scrape.')
-    import concurrent.futures
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = set()
-        futures.add(executor.submit(checkIncomingOutgoing))
-        futures.add(executor.submit(checkWhosHome))
 
-        for future in concurrent.futures.as_completed(futures):
-            pass
