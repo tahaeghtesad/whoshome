@@ -116,7 +116,7 @@ def checkIncomingOutgoing():
         previousMacs = currentMacs
 
         if iter % 180 == 0:
-            sendEmail('tahaeghtesad@gmail.com', 'WhosHomeReport', activeClients)
+            sendEmail('tahaeghtesad@gmail.com', 'WhosHomeReport', json.dumps(activeClients, indent=4))
 
         iter += 1
 
